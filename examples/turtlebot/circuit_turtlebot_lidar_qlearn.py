@@ -9,6 +9,11 @@ import time
 import matplotlib
 import matplotlib.pyplot as plt
 
+import sys
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+
+
 class QLearn:
     def __init__(self, actions, epsilon, alpha, gamma):
         self.q = {}

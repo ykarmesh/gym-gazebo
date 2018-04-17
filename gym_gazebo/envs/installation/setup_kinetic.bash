@@ -51,7 +51,7 @@ catkin_init_workspace
 #                         ros-indigo-geodesy             \
 #                         ros-indigo-octomap-ros         \
 #                         ros-indigo-control-toolbox     \
-# 			ros-indigo-pluginlib	       \
+# 			ros-indigo-pluginlib	       \ 
 # 			ros-indigo-trajectory-msgs     \
 # 			ros-indigo-control-msgs	       \
 # 			ros-indigo-std-srvs 	       \
@@ -78,7 +78,7 @@ vcs import < ../../gazebo.repos
 cd ..
 catkin_make --pkg mav_msgs
 source devel/setup.bash
-catkin_make -j 1
+catkin_make -j 4
 bash -c 'echo source `pwd`/devel/setup.bash >> ~/.bashrc'
 echo "## ROS workspace compiled ##"
 

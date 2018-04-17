@@ -36,6 +36,11 @@ if [ -z "$GYM_GAZEBO_WORLD_ROUND" ]; then
 else
   bash -c 'sed "s,GYM_GAZEBO_WORLD_ROUND=[^;]*,'GYM_GAZEBO_WORLD_ROUND=`pwd`/../assets/worlds/round.world'," -i ~/.bashrc'
 fi
+if [ -z "$GYM_GAZEBO_WORLD_SIMPLE" ]; then
+  bash -c 'echo "export GYM_GAZEBO_WORLD_SIMPLE="`pwd`/../assets/worlds/slam_simple.world >> ~/.bashrc'
+else
+  bash -c 'sed "s,GYM_GAZEBO_WORLD_SIMPLE=[^;]*,'GYM_GAZEBO_WORLD_SIMPLE=`pwd`/../assets/worlds/slam_simple.world'," -i ~/.bashrc'
+fi
 
 #copy altered urdf models
 cp -r ../assets/urdf/kobuki_cnn_urdf/kobuki_urdf/urdf/ catkin_ws/src/kobuki/kobuki_description

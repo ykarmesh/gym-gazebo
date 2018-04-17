@@ -34,11 +34,11 @@ class GazeboCircuit2cTurtlebotCameraNnEnv(gazebo_env.GazeboEnv):
 
         self.reward_range = (-np.inf, np.inf)
 
-        self._seed()
+        self._seed()  # Check seeding here
 
         self.last50actions = [0] * 50
 
-        self.img_rows = 32
+        self.img_rows = 32  # For ORB SLAM, should be larger in size 
         self.img_cols = 32
         self.img_channels = 1
 

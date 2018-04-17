@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 import qlearn
 #import liveplot
 
+import sys
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+
 def render():
     render_skip = 0 #Skip first X episodes.
     render_interval = 50 #Show render Every Y episodes.
@@ -51,7 +55,7 @@ if __name__ == '__main__':
         if qlearn.epsilon > 0.05:
             qlearn.epsilon *= epsilon_discount
 
-        #render() #defined above, not env.render()
+        render() #defined above, not env.render()
 
         state = ''.join(map(str, observation))
 
