@@ -6,8 +6,8 @@ import numpy as np
 import sys
 sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
-sys.path.remove('/usr/lib/python2.7/dist-packages')
-sys.path.append('/usr/lib/python2.7/dist-packages')
+#sys.path.remove('/usr/lib/python2.7/dist-packages')
+#sys.path.append('/usr/lib/python2.7/dist-packages')
 import cv2
 import os
 import random
@@ -40,11 +40,11 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
         # ORB SLAM launched here
         '''uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
         roslaunch.configure_logging(uuid)
-        self.launch = roslaunch.parent.ROSLaunchParent(uuid,["/home/karmesh/gym-gazebo/gym_gazebo/envs/assets/launch/orb_monocular.launch"])
+        self.launch = roslaunch.parent.ROSLaunchParent(uuid,["home/rrc/gym-gazebo/gym_gazebo/envs/assets/launch/orb_monocular.launch"])
         self.launch.start()
         self.launch.spin()'''
         self.port = os.environ["ROS_PORT_SIM"]
-        subprocess.Popen(["roslaunch","-p", self.port, "/home/karmesh/gym-gazebo/gym_gazebo/envs/assets/launch/orb_monocular.launch"])
+        subprocess.Popen(["roslaunch","-p", self.port, "/home/rrc/gym-gazebo/gym_gazebo/envs/assets/launch/orb_monocular.launch"])
 
         self.reset_pub = rospy.Publisher('/ORB_SLAM2/Reset',String, queue_size=1)
         self.vel_pub = rospy.Publisher('/mobile_base/commands/velocity', Twist, queue_size=5)
@@ -68,12 +68,12 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
 
         low = -np.ones(2)
         high = -np.ones(2)
-        self.action_space = spaces.Box(low, high)
+        self.action_space = spaces.Box(low, high, dtype=np.float32)
 
         self.obs_dim = 296; #should be 2(v,w) + 8*8*3(bins(8*8) x features information(no, avg depth, quality)) + 2(goal in polar coor) + 10*10(occupancy grid) 
         high = np.inf*np.ones(self.obs_dim)
         low = -high
-        self.observation_space = spaces.Box(low, high)
+        self.observation_space = spaces.Box(low, high, dtype=np.float32)
 
         self._seed()  # Check seeding here
     	

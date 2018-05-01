@@ -75,10 +75,13 @@ catkin_init_workspace
 cd ../../catkin_ws/src/
 vcs import < ../../gazebo.repos
 
+
 cd ..
 catkin_make --pkg mav_msgs
+echo "CHECKPOINT1"
 source devel/setup.bash
 catkin_make -j 4
+echo "CHECKPOINT2"
 bash -c 'echo source `pwd`/devel/setup.bash >> ~/.bashrc'
 echo "## ROS workspace compiled ##"
 

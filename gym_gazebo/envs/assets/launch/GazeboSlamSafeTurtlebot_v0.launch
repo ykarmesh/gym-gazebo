@@ -15,7 +15,7 @@
     		<arg name="world_name" value="$(arg world_file)"/>
   	</include>
   
-	<include file="/home/karmesh/gym-gazebo/gym_gazebo/envs/assets/worlds/kobuki.launch.xml">
+	<include file="/home/rrc/gym-gazebo/gym_gazebo/envs/assets/worlds/kobuki.launch.xml">
 		<arg name="base" value="$(arg base)"/>
    		<arg name="stacks" value="$(arg stacks)"/>
     		<arg name="3d_sensor" value="$(arg 3d_sensor)"/>
