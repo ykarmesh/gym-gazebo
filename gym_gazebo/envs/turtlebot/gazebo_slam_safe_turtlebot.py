@@ -93,9 +93,9 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
 
         self.start = Pose()
         angles = Vector3()
-        self.start.position.x = 8
-        self.start.position.y = 1
-        angles.z = 2.8
+        self.start.position.x = 7
+        self.start.position.y = -3
+        angles.z = 1.4
         self.start.orientation = self.euler_to_quat(angles)
 
     def goal_observation(self, data):
@@ -275,7 +275,7 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
             if count%5 is 0:
                 vel_cmd.linear.x = -vel_cmd.linear.x
                 rospy.sleep(2)
-            while time.time() - t < 1.0:
+            while time.time() - t < 2.0:
                 self.vel_pub.publish(vel_cmd)
                 r.sleep()
             status = rospy.wait_for_message('/ORB_SLAM2/Status', Bool, timeout=5)
