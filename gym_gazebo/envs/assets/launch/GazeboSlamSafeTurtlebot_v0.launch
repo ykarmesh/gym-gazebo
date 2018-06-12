@@ -19,20 +19,20 @@
 		<arg name="base" value="$(arg base)"/>
    		<arg name="stacks" value="$(arg stacks)"/>
     		<arg name="3d_sensor" value="$(arg 3d_sensor)"/>
-		<arg name="x" value="7"/>
-		<arg name="y" value="-3"/>
-		<arg name="Y" value="1.4"/>
+		<arg name="x" value="0"/>
+		<arg name="y" value="0"/>
+		<arg name="Y" value="1.04720"/>
 	</include>
 
   	<!--node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" required="true">
   		<param name="publish_frequency" type="double" value="30.0" />
   	</node-->
 
-	<node pkg="tf" type="static_transform_publisher" name="Gazebo_base" args="-1.75 -2.15 0 0 0 0 world2D gazebo 30"/>
+	<node pkg="tf" type="static_transform_publisher" name="Gazebo_base" args="0 0 0 0 0 0 gazebo world2D 30"/>
 	<node pkg="tf" type="static_transform_publisher" name="world_odom" args="0 0.3 0 0 -0.5235 1.5707 world odom 30"/>
 
   	<!-- map1, rooms -->
-  	<!--node pkg="tf" type="static_transform_publisher" name="rgb_base" args="0.0 0.0 0.3 -0.683012925973 0.18301186561 -0.18301186561 0.683012925973 world2D world 30"/-->
+  	<node pkg="tf" type="static_transform_publisher" name="rgb_base" args="0.0 0.0 0.3 -0.683012925973 0.18301186561 -0.18301186561 0.683012925973 world2D world 30"/>
 
 	<!-- new_map1 -->
 	<!--node pkg="tf" type="static_transform_publisher" name="rgb_base" args="0.0 0.0 0.3 -0.683012925973 0.18301186561 -0.18301186561 0.683012925973 world2D world 30"/ --> 

@@ -23,6 +23,7 @@ from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import Quaternion
 from geometry_msgs.msg import Vector3
+from std_msgs.msg import Float32MultiArray
 from nav_msgs.msg import OccupancyGrid
 from std_srvs.srv import Empty
 from gazebo_msgs.srv import SetModelState
@@ -48,7 +49,7 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
 
         self.reset_pub = rospy.Publisher('/ORB_SLAM2/Reset',String, queue_size=1)
         self.vel_pub = rospy.Publisher('/mobile_base/commands/velocity', Twist, queue_size=5)
-        self.goal_pub = rospy.Publisher('/move_base/current_goal', PoseStamped, queue_size=5)
+        self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=5)
         self.unpause = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
         self.pause = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
         self.reset_proxy = rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
@@ -56,21 +57,21 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
 
         #message filter subscribers
         self.ts_pose_sub = message_filters.Subscriber('/ORB_SLAM2/Pose', PoseStamped)
-        self.ts_status_sub = message_filters.Subscriber('/ORB_SLAM2/Status', Bool)
+        self.ts_feature_sub = message_filters.Subscriber('/ORB_SLAM2/FeatureInfo', Float32MultiArray)
         self.ts_costmap_sub = message_filters.Subscriber('/move_base/local_costmap/costmap', OccupancyGrid)
 
-        ts = message_filters.ApproximateTimeSynchronizer([self.ts_pose_sub, self.ts_status_sub, self.ts_costmap_sub], 10, 0.1, allow_headerless=True)
+        ts = message_filters.ApproximateTimeSynchronizer([self.ts_pose_sub, self.ts_costmap_sub], 10, 0.1, allow_headerless=True)
         ts.registerCallback(self.callback)
         #rospy.spin()
 
-        self.reward_range = (-np.inf, np.inf) # Range itna kyun rakha hai 
+        self.reward_range = (-np.ones(1), np.ones(1)) # Range itna kyun rakha hai 
         #self.reward_range = (-1, 1)
 
         low = -np.ones(2)
-        high = -np.ones(2)
+        high = np.ones(2)
         self.action_space = spaces.Box(low, high, dtype=np.float32)
 
-        self.obs_dim = 296; #should be 2(v,w) + 8*8*3(bins(8*8) x features information(no, avg depth, quality)) + 2(goal in polar coor) + 10*10(occupancy grid) 
+        self.obs_dim = 355; #WRONG should be 2(v,w) + 8*8*3(bins(8*8) x features information(no, avg depth, quality)) + 2(goal in polar coor) + 10*10(occupancy grid) 
         high = np.inf*np.ones(self.obs_dim)
         low = -high
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
@@ -82,24 +83,27 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
         self.goal_limit = 0.2
         self.robot_radius = 0.22 #size+padding in meters
         self.obstacle_threshold = 50
-        self.map_size_x = 10
-        self.map_size_y = 20
+        self.map_size_x_max = 8
+        self.map_size_y_max = 8
+        self.map_size_x_min = -4
+        self.map_size_y_min = -2
 
         self.goal_done = False
         self.dist = 0
-        self.costmap_data = np.ones(100)
-        self.breakage = False
+        self.costmap_data = np.ones(256)
+        #self.breakage = False
         self.collision = False
+        self.proc = None
 
         self.start = Pose()
         angles = Vector3()
-        self.start.position.x = 7
-        self.start.position.y = -3
-        angles.z = 1.4
+        self.start.position.x = 0 # = 2 (other working option)
+        self.start.position.y = 0 # = 2 
+        angles.z = 1.0472
         self.start.orientation = self.euler_to_quat(angles)
 
     def goal_observation(self, data):
-        if ((data.x - self.goal.x)**2 + (data.y - self.goal.y)**2)**(1/2) < self.goal_limit:
+        if ((data.pose.position.x - self.goal.position.x)**2 + (data.pose.position.y - self.goal.position.y)**2)**(1/2) < self.goal_limit:
             done = True
         else:
             done = False
@@ -115,10 +119,10 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
         return quat
 
     def collision_checker(self, occupancygrid):
-        x1 = occupancygrid.info.width/2 - self.robot_radius/occupancygrid.info.resolution
-        x2 = occupancygrid.info.width/2 + self.robot_radius/occupancygrid.info.resolution
-        y1 = occupancygrid.info.height/2 - self.robot_radius/occupancygrid.info.resolution
-        y2 = occupancygrid.info.height/2 + self.robot_radius/occupancygrid.info.resolution
+        x1 = int(occupancygrid.info.width/2 - self.robot_radius/occupancygrid.info.resolution)
+        x2 = int(occupancygrid.info.width/2 + self.robot_radius/occupancygrid.info.resolution)
+        y1 = int(occupancygrid.info.height/2 - self.robot_radius/occupancygrid.info.resolution)
+        y2 = int(occupancygrid.info.height/2 + self.robot_radius/occupancygrid.info.resolution)
         for i in range(x1,x2):
             for j in range(y1,y2):
                 if occupancygrid.data[i+j*occupancygrid.info.width] > self.obstacle_threshold:
@@ -126,12 +130,13 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
         return False
 
 
-    def callback(self, pose, status, occupancygrid):
-        self.goal_done = self.goal_observation(pose)
-        self.dist = self.perpen_distance(pose)
+    def callback(self, posestamped, occupancygrid):
+        print("Inside Callback")
+        self.goal_done = self.goal_observation(posestamped)
+        self.dist = self.perpen_distance(posestamped)
         self.costmap_data = occupancygrid.data
         self.collision = self.collision_checker(occupancygrid)
-        self.breakage = status
+        #self.breakage = status
         #costmap is publishing slowly, also add the information from the point cloud
 
 
@@ -163,10 +168,10 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
 
 
     def perpen_distance(self, pose):
-    	s_x = self.start.pose.position.x
-    	s_y = self.start.pose.position.y
-    	s_x = self.goal.pose.position.x
-    	s_y = self.goal.pose.position.y
+    	s_x = self.start.position.x
+    	s_y = self.start.position.y
+    	g_x = self.goal.position.x
+    	g_y = self.goal.position.y
     	p_x = pose.pose.position.x
     	p_y = pose.pose.position.y
     	distance = abs((s_x - g_x)*p_y - (s_y - g_y)*p_x + s_y*g_x - g_y*s_x)/((s_x - g_x)**2 + (s_y - g_y)**2)**(1/2)
@@ -190,19 +195,34 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
                 data = rospy.wait_for_message('/scan', LaserScan, timeout=5)
             except:
                 pass
-        done = self.calculate_observation(data)
+        done = self.calculate_observation(data)'''
 
-        self.ob = self.take_observation()
-        while(self.ob is None):
-            self.ob = self.take_observation()'''
+        status_ = None
+        while status_ is None:
+            try:
+                status_ = rospy.wait_for_message('/ORB_SLAM2/Status', Bool, timeout=5)
+            except:
+                pass
 
+        if status_.data is False:
+            os.system("rosnode kill /rviz")
+            os.system("rosnode kill /move_base")
+            os.system("rosnode kill /pcl_filter")
+            self.proc = None
+            rospy.sleep(5)
+
+        rospy.sleep(2)
         goal_done_ = self.goal_done
         dist_ = self.dist
         costmap_data_ = self.costmap_data
-        breakage_ = self.breakage
         collision_ = self.collision
-        rospy.sleep(1)
 
+        feature_ = None
+        while feature_ is None:
+            try:
+                feature_ = rospy.wait_for_message('/ORB_SLAM2/FeatureInfo', Bool, timeout=5)
+            except:
+                pass
 
         rospy.wait_for_service('/gazebo/pause_physics')
         try:
@@ -211,14 +231,14 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
 
-
+        reward = 0
         # Define reward
-        if not breakage_:
-            if not goal_done_:
+        if status_.data is True:
+            if goal_done_ is False:
                 if dist_ > 1:
-                    reward = -0.01
+                    reward = - 0.011
                 else:
-                    reward = -0.01*dist_
+                    reward = - 0.01*dist_ - 0.001
                 if collision_ == True:
                     reward -= 0.1
                 done = False
@@ -229,13 +249,22 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
             reward = -1
             done = True
 
-        state = [self.prev_cmd_vel.linear.x, self.prev_cmd_vel.angular.z, dist_, costmap_data_]
+        temp1 = np.asarray([self.prev_cmd_vel.linear.x, self.prev_cmd_vel.angular.z, dist_])
+        temp2 = np.asarray(feature_.data)
+        temp3 = np.asarray(costmap_data_)
+        state = np.concatenate((temp1,temp2,temp3), axis = 0)
+
         self.prev_cmd_vel = vel_cmd
         return state, reward, done, {}
 
 
     def _reset(self):
 
+        if self.proc is not None:
+            os.system("rosnode kill /rviz")
+            os.system("rosnode kill /move_base")
+            os.system("rosnode kill /pcl_filter")
+            rospy.sleep(5)
         state = SetModelState()
         state.model_name = 'mobile_base'
         state.pose = self.start
@@ -252,10 +281,11 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
         self.reset_pub.publish(reset)
         rospy.sleep(3)
 
-        self.goal = PoseStamped()
-        self.goal.pose.position.x = random.random() * self.map_size_x
-        self.goal.pose.position.y = random.random() * self.map_size_y
-
+        self.goal = Pose()
+        self.goal.position.x = random.random() * (self.map_size_x_max - self.map_size_x_min) + self.map_size_x_min
+        self.goal.position.y = random.random() * (self.map_size_y_max - self.map_size_y_min) + self.map_size_x_min
+        self.goal.orientation.w = 1
+        print(self.goal.position)
         # Unpause simulation to make observation
         rospy.wait_for_service('/gazebo/unpause_physics')
         try:
@@ -268,34 +298,47 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
         vel_cmd = Twist()
         vel_cmd.linear.x = -0.4
         r = rospy.Rate(10)
-        status = Bool()
         count = 0
-        while status.data is False and count < 10:
+        status_ = Bool()
+        while status_.data is False and count < 10:
             t = time.time()
             if count%5 is 0:
                 vel_cmd.linear.x = -vel_cmd.linear.x
-                rospy.sleep(2)
+                #rospy.sleep(2)
             while time.time() - t < 2.0:
                 self.vel_pub.publish(vel_cmd)
                 r.sleep()
-            status = rospy.wait_for_message('/ORB_SLAM2/Status', Bool, timeout=5)
-            print(status)
-            print(vel_cmd.linear.x)
+            status_ = rospy.wait_for_message('/ORB_SLAM2/Status', Bool, timeout=5)
+            print(status_)
             count += 1
             rospy.sleep(1)
                 # what will happen if SLAM is still not initialized
 
-        if status is False:
+        if status_ is False:
             state = self._reset()
             return state
 
-        self.goal_pub.publish(self.goal)
+        rospy.sleep(2)
+        #self.port = os.environ["ROS_PORT_SIM"]
+        self.proc = subprocess.Popen(["roslaunch","-p", self.port, "/home/rrc/gym-gazebo/gym_gazebo/envs/assets/launch/navigation_stack_rl.launch"])
+        rospy.sleep(5)
+        goal_published = PoseStamped()
+        goal_published.pose = self.goal;
+        goal_published.header.frame_id = "odom"
+        self.goal_pub.publish(goal_published)
 
+        rospy.sleep(1)
         goal_done_ = self.goal_done
         dist_ = self.dist
         costmap_data_ = self.costmap_data
-        breakage_ = self.breakage
         collision_ = self.collision
+
+        feature_ = None
+        while feature_ is None:
+            try:
+                feature_ = rospy.wait_for_message('/ORB_SLAM2/FeatureInfo', Bool, timeout=5)
+            except:
+                pass
 
         # pause simulation
         rospy.wait_for_service('/gazebo/pause_physics')
@@ -305,6 +348,9 @@ class GazeboSlamSafeTurtlebotEnv(gazebo_env.GazeboEnv):
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
 
-        state = [self.prev_cmd_vel.linear.x, self.prev_cmd_vel.angular.z, dist_, costmap_data_]
+        temp1 = np.asarray([self.prev_cmd_vel.linear.x, self.prev_cmd_vel.angular.z, dist_])
+        temp2 = np.asarray(feature_.data)
+        temp3 = np.asarray(costmap_data_)
+        state = np.concatenate((temp1,temp2,temp3), axis = 0)
 
         return state
